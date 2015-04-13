@@ -231,7 +231,7 @@ func (this *Db) Describe() (FileDescriptor, error) {
 	this.Descriptor.Ways = ExtendInt64(this.Descriptor.Ways, end)
 	this.Descriptor.Relations = ExtendInt64(this.Descriptor.Relations, end)
 	this.Descriptor.NodesId = ExtendInt64(this.Descriptor.NodesId, MaxInt64)
-	this.Descriptor.RelationsId = ExtendInt64(this.Descriptor.RelationsId, MaxInt64)
+	this.Descriptor.WaysId = ExtendInt64(this.Descriptor.WaysId, MaxInt64)
 	this.Descriptor.RelationsId = ExtendInt64(this.Descriptor.RelationsId, MaxInt64)
 
 	this.Descriptor.NodeCount = nc
