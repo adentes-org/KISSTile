@@ -29,6 +29,7 @@ type Db struct {
 	nbProc     int
 }
 
+//TODO in descritor use array for count that increment in that the last is the total
 // Open returns a new Db that reads from file.
 func OpenDB(file string) (*Db, error) {
 	f, err := os.Open(file)
