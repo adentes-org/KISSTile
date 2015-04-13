@@ -18,18 +18,6 @@ const MaxInt64 = int64(MaxUint64 >> 1)
 //TODO used Sizeof and used a Mo,Mb type
 const CacheSize = 500000
 
-type FileDescriptor struct {
-	Nodes         []int64
-	NodeCount     int64
-	Ways          []int64
-	WayCount      int64
-	Relations     []int64
-	RelationCount int64
-	NodesId       []int64
-	WaysId        []int64
-	RelationsId   []int64
-}
-
 //TODO pass to Point to save space
 //TODO optimize cache to take account of last access time to grabage not used
 type Db struct {
@@ -37,6 +25,7 @@ type Db struct {
 	File       *os.File
 	Descriptor FileDescriptor
 	Cache      *NodeCache
+	WayIndex   Index
 	nbProc     int
 }
 
@@ -63,22 +52,31 @@ func (this *Db) Analyze(n int) error {
 		return err
 	}
 
-	_, err = this.Describe()
+	//TODO load from backup if it's allready analyze
+	_, err = this.Descriptor.LoadOrCreateOf(this.File.Name())
 	if err != nil {
-		return err
+		_, err = this.Describe()
+		if err != nil {
+			return err
+		}
 	}
+	this.Descriptor.Save(this.File.Name())
 
-	err = this.ParseWays()
+	//TODO check if Index is file from allr eady analyze and catch up analyze
+	_, err = this.WayIndex.LoadOrCreateOf(this.File.Name())
 	if err != nil {
-		return err
+		err = this.ParseWays()
+		if err != nil {
+			return err
+		}
 	}
+	//	this.WayIndex.save()
 
 	return nil
 }
 
 // Scan before processing need to be call frist after start.
 func (this *Db) ParseWays() error {
-	//	ways := make(map[int64]*osmpbf.Way)
 	//Le dernier est un faux
 
 	start := time.Now()
@@ -99,84 +97,13 @@ func (this *Db) ParseWays() error {
 			case *osmpbf.Way:
 				cw++
 				ways = ExtendWays(ways, v)
-				//				ways[v.ID] = v
 				//TODO check ways with no nodes maybe ?
-				/*
-					for id, nodeId := range v.NodeIDs {
-						cn++
-						node, err := this.GetNode(nodeId)
-						if err != nil {
-							return err
-						}
-						p := geo.Point{node.Lon, node.Lat}
-						if id == 0 {
-							bb = geo.Bbox{p, p}
-						} else {
-							//TODO
-							if !p.InBbox(bb) {
-								//We need to enlarge the Bbox
-							}
-						}
-					}
-				*/
-
-				//TODO used an orderedt list
+				//TODO used an ordered list
 				for _, nodeId := range v.NodeIDs {
 					wanted[nodeId] = nil
 				}
-				/*
-					//TODO declancher if end
-					if len(wanted) > CacheSize {
-						log.Printf("On parse les points pour %d soit %d nodes recherchés", len(ways), len(wanted))
-						// On cherche les points
-						for i := 0; i < len(this.Descriptor.Nodes)-1; i++ {
-							ns, err := this.Decoder.DecodeBlocAt(this.Descriptor.Nodes[i])
-							if err != nil {
-								return err
-							}
-							for _, v := range ns {
-								switch v := v.(type) {
-								case *osmpbf.Node:
-									if _, ok := wanted[v.ID]; ok {
-										delete(wanted, v.ID)
-										found[v.ID] = v
-									}
-									break
-								}
-							}
-						}
-
-						for _, way := range ways {
-							for id, nodeId := range way.NodeIDs {
-								cn++
-								node := found[nodeId]
-								p := geo.Point{node.Lon, node.Lat}
-
-								if id == 0 {
-									bb = geo.Bbox{p, p}
-								} else {
-									//TODO
-									if !p.InBbox(bb) {
-										//We need to enlarge the Bbox
-									}
-								}
-							}
-						}
-
-						log.Printf("All %d nodes found", len(found))
-
-						wanted = make(map[int64]*osmpbf.Node)
-						found = make(map[int64]*osmpbf.Node)
-						ways = make([]*osmpbf.Way, 0)
-					}
-				*/
 				break
 			}
-			/*
-				if cw%30000 == 1 {
-					log.Printf("Ways parsed : %d soit %d nodes", cw, cn)
-				}
-			*/
 		}
 		if len(wanted) > CacheSize || i == len(this.Descriptor.Ways)-2 {
 			log.Printf("On parse les points pour %d ways soit %d nodes recherchés", len(ways), len(wanted))
@@ -198,8 +125,16 @@ func (this *Db) ParseWays() error {
 						bb.AddInnerPoint(p)
 					}
 				}
+				// environ 15% de temps en plus
+				this.WayIndex.Add(way.ID, bb)
 			}
 
+			this.WayIndex.Get(ways[0].ID)
+			/* //TODO ajout par batch
+			log.Println("Starting db insertion")
+			this.WayIndex.AddBatch(ways, bb)
+			log.Println("db insertion ended")
+			*/
 			ways = make([]*osmpbf.Way, 0)
 
 			estimation := time.Since(start).Minutes() * (float64(this.Descriptor.WayCount) / float64(cw))
@@ -248,11 +183,6 @@ func (this *Db) Describe() (FileDescriptor, error) {
 				return this.Descriptor, fmt.Errorf("Unknown type %T", v)
 			}
 		}
-		/*
-			if (nc+wc+rc)%2000000 == 0 {
-				log.Printf("Nodes: %dk, Ways: %dk, Relations: %dk", nc/1000, wc/1000, rc/1000)
-			}
-		*/
 	}
 
 	//On ajout une nouvelle entrée de fin pour faciliter le traitement
