@@ -22,7 +22,7 @@ func (this *NodeCache) get(id int64) (*osmpbf.Node, bool) {
 
 func (this *NodeCache) add(node *osmpbf.Node) {
 	if len(this.Nodes) > this.Size {
-		i := this.Size / 1000 //On enleve un pour cent du cache
+		i := this.Size / 1000 //On enleve un pour mille du cache
 		for id := range this.Nodes {
 			delete(this.Nodes, id)
 			i--

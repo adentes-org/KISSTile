@@ -16,7 +16,7 @@ const MaxUint64 = ^uint64(0)
 const MaxInt64 = int64(MaxUint64 >> 1)
 
 //TODO used Sizeof and used a Mo,Mb type
-const CacheSize = 500000
+const CacheSize = 1750000
 
 //TODO pass to Point to save space
 //TODO optimize cache to take account of last access time to grabage not used
@@ -65,13 +65,26 @@ func (this *Db) Analyze(n int) error {
 	//TODO check if Index is file from allr eady analyze and catch up analyze
 	_, err = this.WayIndex.LoadOrCreateOf(this.File.Name())
 	if err != nil {
+		log.Printf("error : %v", err)
+	}
+	//Si la base est inférieur on parse
+	//TODO better check and retrieve where we stop or what is missing
+	log.Printf("There is %d ways indexed", this.WayIndex.Size())
+	log.Printf("Last  ways indexed : %d", this.WayIndex.Last())
+	log.Printf("There is %d ways in file", this.Descriptor.WayCount)
+	if this.WayIndex.Size() < this.Descriptor.WayCount {
+		log.Printf("Start parsing for %d ways", this.Descriptor.WayCount-this.WayIndex.Size())
+		//TODO not reset and catch up
+		//this.WayIndex.ResetOf(this.File.Name())
 		err = this.ParseWays()
 		if err != nil {
 			return err
 		}
 	}
-	//	this.WayIndex.save()
-
+	// Test
+	log.Printf("%v", this.Descriptor.WaysId[0])
+	a, e := this.WayIndex.Get(this.Descriptor.WaysId[0])
+	log.Printf("%v %v", a, e)
 	return nil
 }
 
@@ -81,13 +94,24 @@ func (this *Db) ParseWays() error {
 
 	start := time.Now()
 
+	//On pull les dernier et on sync in order to "close" database at the end.
+	defer this.WayIndex.PullBatch(true)
+	//	defer this.WayIndex.db.Close()
+
 	var bb geo.Bbox
 	var ways []*osmpbf.Way
 	wanted := make(map[int64]*osmpbf.Node)
 
-	var cw, cn int64
+	var cw, cow, cn, last int64
+	cow = this.WayIndex.Size()
+	last = this.WayIndex.Last()
 	//TODO find nodes by block of wa in order to not redecode the start of a block
 	for i := 0; i < len(this.Descriptor.Ways)-1; i++ {
+		if this.Descriptor.WaysId[i+1] < last {
+			//There always be i+1 since the for condition
+			continue
+		}
+		//log.Printf("Parsing block : %d", i)
 		objects, err := this.Decoder.DecodeBlocAt(this.Descriptor.Ways[i])
 		if err != nil {
 			return err
@@ -95,7 +119,16 @@ func (this *Db) ParseWays() error {
 		for _, v := range objects {
 			switch v := v.(type) {
 			case *osmpbf.Way:
+				//TODO better take to long and my be more slow that the little advatage it gave by resuming
+				//if has, _ := this.WayIndex.db.Has(Int64bytes(v.ID), nil); has
+				if v.ID <= last {
+					//log.Printf("Passing %d", v.ID)
+					//cow++
+					continue
+				}
+
 				cw++
+				//log.Printf("Adding to search %d", v.ID)
 				ways = ExtendWays(ways, v)
 				//TODO check ways with no nodes maybe ?
 				//TODO used an ordered list
@@ -128,8 +161,13 @@ func (this *Db) ParseWays() error {
 				// environ 15% de temps en plus
 				this.WayIndex.Add(way.ID, bb)
 			}
+			//TODO check For update of file
+			//this.WayIndex.db.Sync()
 
-			this.WayIndex.Get(ways[0].ID)
+			//For testing purpose
+			//log.Printf("%v %v", ways[0].ID, ways[0])
+			//a, e := this.WayIndex.Get(ways[0].ID)
+			//log.Printf("%v %v", a, e)
 			/* //TODO ajout par batch
 			log.Println("Starting db insertion")
 			this.WayIndex.AddBatch(ways, bb)
@@ -137,10 +175,10 @@ func (this *Db) ParseWays() error {
 			*/
 			ways = make([]*osmpbf.Way, 0)
 
-			estimation := time.Since(start).Minutes() * (float64(this.Descriptor.WayCount) / float64(cw))
+			estimation := time.Since(start).Minutes() * (float64(this.Descriptor.WayCount-cow) / float64(cw))
 
 			time_esti, _ := time.ParseDuration(fmt.Sprintf("%.4fm", estimation))
-			log.Printf("%dk/%dk %.2f/100 TIME ELAPSED : %s ESTIMATION : %s\r", cw/1000, this.Descriptor.WayCount/1000, float64(cw*100)/float64(this.Descriptor.WayCount), time.Since(start).String(), time_esti.String())
+			log.Printf("%dk/%dk %.2f/100 TIME ELAPSED : %s ESTIMATION : %s\r", (cw+cow)/1000, this.Descriptor.WayCount/1000, float64((cw+cow)*100)/float64(this.Descriptor.WayCount), time.Since(start).String(), time_esti.String())
 		}
 	}
 

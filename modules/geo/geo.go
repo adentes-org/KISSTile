@@ -6,6 +6,7 @@ type Point struct {
 	Lon, Lat float64
 }
 
+//TODO pass to float32 point in order to save space for index
 // 0 : SW 1 : NE
 type Bbox [2]Point
 

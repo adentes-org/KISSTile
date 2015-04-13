@@ -13,6 +13,7 @@ const APP_VER = "0.0.1.0001 Alpha"
 
 func main() {
 	//TODO
+	//TODO use mbrickade bbox float32 for date and relative inside
 	runtime.GOMAXPROCS(4)
 
 	app := cli.NewApp()
