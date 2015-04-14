@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+//TODO use WayCount and NodeCount to optimize parsing
 //TODO search better
 const MaxUint64 = ^uint64(0)
 const MaxInt64 = int64(MaxUint64 >> 1)
@@ -72,9 +73,9 @@ func (this *Db) Analyze(n int) error {
 	//TODO better check and retrieve where we stop or what is missing
 	log.Printf("There is %d ways indexed", this.WayIndex.Size())
 	log.Printf("Last  ways indexed : %d", this.WayIndex.Last())
-	log.Printf("There is %d ways in file", this.Descriptor.WayCount)
-	if this.WayIndex.Size() < this.Descriptor.WayCount {
-		log.Printf("Start parsing for %d ways", this.Descriptor.WayCount-this.WayIndex.Size())
+	log.Printf("There is %d ways in file", this.Descriptor.TotalWay())
+	if this.WayIndex.Size() < this.Descriptor.TotalWay() {
+		log.Printf("Start parsing for %d ways", this.Descriptor.TotalWay()-this.WayIndex.Size())
 		//TODO not reset and catch up
 		//this.WayIndex.ResetOf(this.File.Name())
 		err = this.ParseWays()
@@ -83,9 +84,11 @@ func (this *Db) Analyze(n int) error {
 		}
 	}
 	// Test
-	log.Printf("%v", this.Descriptor.WaysId[0])
-	a, e := this.WayIndex.Get(this.Descriptor.WaysId[0])
-	log.Printf("%v %v", a, e)
+	/*
+		log.Printf("%v", this.Descriptor.WaysId[0])
+		a, e := this.WayIndex.Get(this.Descriptor.WaysId[0])
+		log.Printf("%v %v", a, e)
+	*/
 	return nil
 }
 
@@ -176,10 +179,10 @@ func (this *Db) ParseWays() error {
 			*/
 			ways = make([]*osmpbf.Way, 0)
 
-			estimation := time.Since(start).Minutes() * (float64(this.Descriptor.WayCount-cow) / float64(cw))
+			estimation := time.Since(start).Minutes() * (float64(this.Descriptor.TotalWay()-cow) / float64(cw))
 
 			time_esti, _ := time.ParseDuration(fmt.Sprintf("%.4fm", estimation))
-			log.Printf("%dk/%dk %.2f/100 TIME ELAPSED : %s ESTIMATION : %s\r", (cw+cow)/1000, this.Descriptor.WayCount/1000, float64((cw+cow)*100)/float64(this.Descriptor.WayCount), time.Since(start).String(), time_esti.String())
+			log.Printf("%dk/%dk %.2f/100 TIME ELAPSED : %s ESTIMATION : %s\r", (cw+cow)/1000, this.Descriptor.TotalWay()/1000, float64((cw+cow)*100)/float64(this.Descriptor.TotalWay()), time.Since(start).String(), time_esti.String())
 		}
 	}
 
@@ -188,7 +191,7 @@ func (this *Db) ParseWays() error {
 
 // Scan before processing need to be call frist after start.
 func (this *Db) Describe() (FileDescriptor, error) {
-	var nc, wc, rc int64
+	var nc, wc, rc, last_pos int64
 	for {
 		//pos, _ := this.File.Seek(0, 1)
 		if v, pos, err := this.Decoder.Decode(); err == io.EOF {
@@ -221,6 +224,17 @@ func (this *Db) Describe() (FileDescriptor, error) {
 			default:
 				return this.Descriptor, fmt.Errorf("Unknown type %T", v)
 			}
+			//Initialisation de la position
+			if last_pos == 0 {
+				last_pos = pos
+			}
+			//Si on change de block on insert les counts
+			if last_pos != pos {
+				last_pos = pos
+				this.Descriptor.NodeCount = ExtendInt64(this.Descriptor.NodeCount, nc)
+				this.Descriptor.WayCount = ExtendInt64(this.Descriptor.WayCount, wc)
+				this.Descriptor.RelationCount = ExtendInt64(this.Descriptor.RelationCount, rc)
+			}
 		}
 	}
 
@@ -233,10 +247,13 @@ func (this *Db) Describe() (FileDescriptor, error) {
 	this.Descriptor.NodesId = ExtendInt64(this.Descriptor.NodesId, MaxInt64)
 	this.Descriptor.WaysId = ExtendInt64(this.Descriptor.WaysId, MaxInt64)
 	this.Descriptor.RelationsId = ExtendInt64(this.Descriptor.RelationsId, MaxInt64)
-
-	this.Descriptor.NodeCount = nc
-	this.Descriptor.WayCount = wc
-	this.Descriptor.RelationCount = rc
+	this.Descriptor.NodeCount = ExtendInt64(this.Descriptor.NodeCount, nc)
+	this.Descriptor.WayCount = ExtendInt64(this.Descriptor.WayCount, wc)
+	this.Descriptor.RelationCount = ExtendInt64(this.Descriptor.RelationCount, rc)
+	//TODO use array
+	//this.Descriptor.NodeCount = nc
+	//this.Descriptor.WayCount = wc
+	//this.Descriptor.RelationCount = rc
 
 	log.Printf("DB contains Nodes: %dk, Ways: %dk, Relations: %dk", nc/1000, wc/1000, rc/1000)
 	log.Printf("DB descritor Nodes: %d, Ways: %d, Relations: %d",

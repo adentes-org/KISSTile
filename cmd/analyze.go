@@ -8,11 +8,20 @@ import (
 	"./../modules/db"
 )
 
+type BoolFlag struct {
+	Name   string
+	Usage  string
+	EnvVar string
+}
+
 var CmdAnalyze = cli.Command{
 	Name:        "analyze",
 	Usage:       "Run the pre-analyze of the ospbf",
 	Description: "This is run by the serve before running if it wasn't done before",
 	Action:      runAnalyze,
+	Flags: []cli.Flag{
+		cli.BoolFlag{"force-rescan, Rf", "Clean index and descriptor and force re-scan //TOIMPLEMENT", ""},
+	},
 }
 
 func runAnalyze(ctx *cli.Context) {

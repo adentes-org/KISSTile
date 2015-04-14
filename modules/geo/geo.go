@@ -37,6 +37,11 @@ func (p *Point) InBbox(bb *Bbox) bool {
 	return p.Lon >= bb[0].Lon && p.Lon <= bb[1].Lon && p.Lat >= bb[0].Lat && p.Lat <= bb[1].Lat
 }
 
+/*
+func BboxFromZXY(z int, x int, y int) Bbox {
+	return Bbox{Point{}, Point{}}
+}
+*/
 func min(a, b float64) float64 {
 	if a <= b {
 		return a

@@ -10,11 +10,11 @@ import (
 
 type FileDescriptor struct {
 	Nodes         []int64
-	NodeCount     int64
+	NodeCount     []int64
 	Ways          []int64
-	WayCount      int64
+	WayCount      []int64
 	Relations     []int64
-	RelationCount int64
+	RelationCount []int64
 	NodesId       []int64
 	WaysId        []int64
 	RelationsId   []int64
@@ -48,4 +48,8 @@ func (this *FileDescriptor) Save(file string) error {
 func (this *FileDescriptor) getFilenameFromFile(file string) string {
 	var extension = filepath.Ext(file)
 	return strings.Join([]string{file[0 : len(file)-len(extension)], "desc"}, ".")
+}
+
+func (this *FileDescriptor) TotalWay() int64 {
+	return this.WayCount[len(this.WayCount)-1]
 }
