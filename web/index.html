@@ -1,0 +1,17 @@
+<html>
+	<head>
+		<title>Testing ...</title>
+		<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+		<script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+	</head>
+	<body>
+	<div id="map" style="height: 100%;width: 100%;position: absolute;top:0;left:0;"></div>
+	<script>
+	// create a map in the "map" div, set the view to a given place and zoom
+var map = L.map('map').setView([42.12,  8.9], 9);
+
+// add an OpenStreetMap tile layer
+L.tileLayer('http://localhost/api/tile/{z}/{x}/{y}.jpg', {}).addTo(map);
+	</script>
+	</body>
+</html>

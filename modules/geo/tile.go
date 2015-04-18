@@ -1,6 +1,13 @@
 package geo
 
 import (
+	"code.google.com/p/draw2d/draw2d"
+	"errors"
+	"github.com/sapk/osmpbf"
+	"image"
+	"image/color"
+	"image/draw"
+	//"log"
 	"math"
 )
 
@@ -13,7 +20,12 @@ type Tile struct {
 }
 
 const lat_panel = 85.0511 * 2
+
+//TODO  do not draw to small BBox compare to too bigger and not bigger once
+//const lat_panel = 90 * 2
 const lon_panel = 180 * 2
+
+const tileSize = 256
 
 type Conversion interface {
 	deg2num(t *Tile) (x int, y int)
@@ -66,12 +78,68 @@ func PrecisionAtZLevel(zoom int) (lat float64, lon float64) {
 	//Precision
 	lat = lat_panel / n
 	lon = lon_panel / n
-	return lat, lon
+	//TODO why ?
+	return lat * math.Pi / 2, lon
 }
 
 func (t *Tile) GetBBOX() Bbox {
 	//TODO cache the result in struct of tile
 	p_lat, p_lon := PrecisionAtZLevel(t.Z)
-	return Bbox{Point{t.Lat, t.Lon}, Point{t.Lat - p_lat, t.Lon + p_lon}}
+	bb := Bbox{Point{t.Lat - p_lat, t.Lon}, Point{t.Lat, t.Lon + p_lon}}
+	//bb.OrderBbox()
+	return bb
 
+}
+
+func (t *Tile) DrawTile(ways map[int64]*osmpbf.Way, nodes map[int64]*osmpbf.Node, debug bool) (image.Image, error) {
+	//TODO plot unique point
+	// Create white image
+	img := image.NewRGBA(image.Rect(0, 0, tileSize, tileSize))
+	draw.Draw(img, img.Bounds(), image.White, image.ZP, draw.Src)
+	plat, plon := PrecisionAtZLevel(t.Z)
+
+	// Plot ways
+	for _, way := range ways {
+		/*
+			if mapFeatures[fName].MinZoom > zoom {
+				continue
+			}
+		*/
+		//*
+		//TODO filter before
+		if val, ok := way.Tags["natural"]; !ok {
+			//FORTEST if it'nst a natural we pass
+			if val != "coastline" {
+				continue
+			}
+		}
+		//*/
+		coords := [][]float64{}
+		for _, nodeID := range way.NodeIDs {
+			//TODO relative path ° to px
+			if _, ok := nodes[nodeID]; !ok {
+				return nil, errors.New("node not found")
+			}
+			coords = append(coords, []float64{(nodes[nodeID].Lon - t.Lon) * tileSize / plon, (t.Lat - nodes[nodeID].Lat) * tileSize / plat})
+		}
+		drawPolyLine(img, color.Black, coords)
+		//	log.Printf("way : %v", way)
+		//	log.Printf("coords : %v", coords)
+	}
+	return img, nil
+}
+
+func drawPolyLine(img *image.RGBA, color color.Color, coords [][]float64) {
+	path := draw2d.NewPathStorage()
+	for i, coord := range coords {
+		if i == 0 {
+			path.MoveTo(coord[0], coord[1])
+		} else {
+			path.LineTo(coord[0], coord[1])
+		}
+	}
+
+	gc := draw2d.NewGraphicContext(img)
+	gc.SetStrokeColor(color)
+	gc.Stroke(path)
 }

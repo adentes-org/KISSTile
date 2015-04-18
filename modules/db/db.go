@@ -167,7 +167,11 @@ func (this *Db) ParseWays() error {
 					}
 				}
 				// environ 15% de temps en plus
-				this.WayIndex.Add(way.ID, bb)
+				tag := "other"
+				if _, ok := way.Tags["natural"]; ok {
+					tag = "natural"
+				}
+				this.WayIndex.Add(way.ID, tag, bb)
 			}
 			//TODO check For update of file
 			//this.WayIndex.db.Sync()
@@ -271,6 +275,45 @@ func (this *Db) Describe() (FileDescriptor, error) {
 }
 
 // Get multiples node by ids at a time.
+//TODO not used map array but ordered list and clear one at a time
+//TODO determine block we only need to decrypt
+func (this *Db) GetWays(wanted *map[int64]*osmpbf.Way) (map[int64]*osmpbf.Way, error) {
+	found := make(map[int64]*osmpbf.Way)
+	for i := 0; i < len(this.Descriptor.Ways)-1; i++ {
+		ns, err := this.Decoder.DecodeBlocAt(this.Descriptor.Ways[i])
+		if err != nil {
+			return nil, err
+		}
+		for _, v := range ns {
+			switch v := v.(type) {
+			case *osmpbf.Way:
+				if _, ok := (*wanted)[v.ID]; ok {
+					delete(*wanted, v.ID)
+					found[v.ID] = v
+				}
+				break
+			}
+		}
+
+		if len(*wanted) == 0 {
+			//On s'arrete là
+			break
+		}
+
+		//TODO only read needed
+		/*
+			if len(wanted) == 0 {
+				// on arrete y'a plus rien à chercher
+				break
+			}
+		*/
+	}
+	//log.Printf("All %d ways found", len(found))
+
+	return found, nil
+}
+
+// Get multiples node by ids at a time.
 func (this *Db) GetNodes(wanted *map[int64]*osmpbf.Node) (map[int64]*osmpbf.Node, error) {
 	found := make(map[int64]*osmpbf.Node)
 	// On cherche les points
@@ -289,6 +332,11 @@ func (this *Db) GetNodes(wanted *map[int64]*osmpbf.Node) (map[int64]*osmpbf.Node
 				break
 			}
 		}
+
+		if len(*wanted) == 0 {
+			//On s'arrete là
+			break
+		}
 		//TODO only read needed
 		/*
 			if len(wanted) == 0 {
@@ -297,7 +345,7 @@ func (this *Db) GetNodes(wanted *map[int64]*osmpbf.Node) (map[int64]*osmpbf.Node
 			}
 		*/
 	}
-	log.Printf("All %d nodes found", len(found))
+	//log.Printf("All %d nodes found", len(found))
 	return found, nil
 }
 

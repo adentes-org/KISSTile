@@ -2,6 +2,10 @@
 
 package geo
 
+import (
+	"math"
+)
+
 type Point struct {
 	Lon, Lat float64
 }
@@ -12,6 +16,11 @@ type Bbox [2]Point
 
 func (bb *Bbox) IntersectWith(bb_inter Bbox) bool {
 	return bb[0].InBbox(&bb_inter) || bb[1].InBbox(&bb_inter) || bb_inter[0].InBbox(bb) || bb_inter[1].InBbox(bb)
+}
+
+//Represente distance of the bbox in order to filter
+func (bb *Bbox) Size() float64 {
+	return math.Sqrt(math.Pow(bb[1].Lat-bb[0].Lat, 2) + math.Pow(bb[1].Lon-bb[0].Lon, 2))
 }
 func (bb *Bbox) OrderBbox() {
 	// 0 < 1 in order to have [SW,NE]

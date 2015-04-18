@@ -10,10 +10,12 @@ import (
 	//	"errors"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb/util"
 	"log"
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -33,21 +35,28 @@ const bucket_name string = "Ways"
 func (this *Index) Close() error {
 	return this.db.Close()
 }
-func (this *Index) GetWayInBBox(bb geo.Bbox) ([]int64, error) {
-	var n int64
-	iter := this.db.NewIterator(nil, nil)
+func (this *Index) GetWayInBBox(bb geo.Bbox, tag string) ([]int64, error) {
+	var ret []int64
+	size := bb.Size()
+	iter := this.db.NewIterator(util.BytesPrefix([]byte(tag+":")), nil)
 	for iter.Next() {
 		key := iter.Key()
 		//log.Println(iter.Key())
-		if key[0] != byte('_') && bb.IntersectWith(Bboxfrombytes(iter.Value())) {
-			//log.Println(iter.Key())
-			n++
+		if key[0] != byte('_') {
+			tmp := Bboxfrombytes(iter.Value())
+			//TODO determine best ratio
+			if bb.IntersectWith(tmp) && size < tmp.Size()*256 && size*256 > tmp.Size() {
+				//log.Println(iter.Key())
+				//				ret = append(ret, Int64frombytes(key))
+				k, _ := strconv.ParseInt(strings.Split(string(key[:]), ":")[1], 10, 64)
+				ret = append(ret, k)
+			}
 		}
 	}
 	iter.Release()
 	err := iter.Error()
-	log.Println(n)
-	return nil, err
+	log.Printf("%d Ways found in %v", len(ret), bb)
+	return ret, err
 }
 func (this *Index) LoadOrCreateOf(file string) (*Index, error) {
 
@@ -93,7 +102,7 @@ func (this *Index) LoadOrCreateOf(file string) (*Index, error) {
 	return this, nil
 }
 
-func (this *Index) Add(wayid int64, bb geo.Bbox) error {
+func (this *Index) Add(wayid int64, tag string, bb geo.Bbox) error {
 	//TODO optimize for batch write
 	//TODO use  this.tmp and write by bloclk useless ?
 	//TODO check if el exist in order to not count in count
@@ -110,7 +119,9 @@ func (this *Index) Add(wayid int64, bb geo.Bbox) error {
 		})
 	*/
 	this.last = wayid
-	this.batch.Put(Int64bytes(wayid), data)
+	//	this.batch.Put(Int64bytes(wayid), data)
+	this.batch.Put([]byte(tag+":"+strconv.FormatInt(wayid, 10)), data)
+
 	//TODO set const for batch max_size
 	if this.batch.Len() > this.batch_size {
 		err := this.PullBatch(false)

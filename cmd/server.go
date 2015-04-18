@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"./../modules/api"
-	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/gorilla/mux"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -29,6 +29,7 @@ func runServer(ctx *cli.Context) {
 	}
 
 	db := Analyze(file)
+	log.Println("Database ready !")
 	ap := api.Init(db)
 
 	router := mux.NewRouter().StrictSlash(true)
@@ -50,5 +51,9 @@ func runServer(ctx *cli.Context) {
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Welcome!")
+	//fmt.Fprintln(w, "Welcome!")
+	log.Println("Someone get index page !")
+	b, _ := ioutil.ReadFile("web/index.html")
+	w.Write(b)
+
 }
