@@ -45,6 +45,10 @@ func OpenDB(file string) (*Db, error) {
 	}, nil
 }
 
+func (this *Db) Close() error {
+	return this.WayIndex.Close()
+}
+
 // Get all nodes inside a bbox .
 func (this *Db) Analyze(n int) error {
 	//this.Descriptor.Nodes = make([]int64, 0, 10)

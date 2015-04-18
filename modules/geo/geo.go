@@ -10,6 +10,9 @@ type Point struct {
 // 0 : SW 1 : NE
 type Bbox [2]Point
 
+func (bb *Bbox) IntersectWith(bb_inter Bbox) bool {
+	return bb[0].InBbox(&bb_inter) || bb[1].InBbox(&bb_inter) || bb_inter[0].InBbox(bb) || bb_inter[1].InBbox(bb)
+}
 func (bb *Bbox) OrderBbox() {
 	// 0 < 1 in order to have [SW,NE]
 	if bb[0].Lon > bb[1].Lon {

@@ -31,6 +31,11 @@ func runAnalyze(ctx *cli.Context) {
 		file = ctx.Args()[0]
 	}
 
+	Analyze(file)
+}
+
+func Analyze(file string) *db.Db {
+
 	log.Printf("Analyzing file : %s", file)
 
 	db, _ := db.OpenDB(file)
@@ -39,5 +44,7 @@ func runAnalyze(ctx *cli.Context) {
 
 	db.Analyze(runtime.GOMAXPROCS(-1))
 
+	return db
+	//db.Close()
 	//log.Printf("Result : %s %s", db, err)
 }

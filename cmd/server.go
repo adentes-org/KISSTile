@@ -22,20 +22,28 @@ var CmdServer = cli.Command{
 }
 
 func runServer(ctx *cli.Context) {
-	runAnalyze(ctx)
+	//TODO check for args and no default
+	file := "../isle-of-man-latest.osm.pbf"
+	if len(ctx.Args()) > 0 {
+		file = ctx.Args()[0]
+	}
+
+	db := Analyze(file)
+	ap := api.Init(db)
+
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", Index)
-	router.HandleFunc("/api", api.Index)
-	router.HandleFunc("/api/version", api.Version)
-	router.HandleFunc("/api/status", api.Version)
+	router.HandleFunc("/api", ap.Index)
+	router.HandleFunc("/api/version", ap.Version)
+	router.HandleFunc("/api/status", ap.Version)
 	/*
 		router.HandleFunc("/api/{apiVersion}/map", api.Map)
 		router.HandleFunc("/api/{apiVersion}/permissions", api.Permissions)
 		//NOTPLANNED router.HandleFunc("/api/{apiVersion}/changeset", api.Changeset)
 		router.HandleFunc("/api/{apiVersion}/trackpoints", api.Trackpoints)
 	*/
-	router.HandleFunc("/api/tile/{zoom:[0-1]?[0-9]}/{x:[0-9]+}/{y:[0-9]+}", api.Tile)
-	router.HandleFunc("/api/tile/{zoom:[0-1]?[0-9]}/{x:[0-9]+}/{y:[0-9]+}.{format}", api.Tile)
+	router.HandleFunc("/api/tile/{zoom:[0-1]?[0-9]}/{x:[0-9]+}/{y:[0-9]+}", ap.Tile)
+	router.HandleFunc("/api/tile/{zoom:[0-1]?[0-9]}/{x:[0-9]+}/{y:[0-9]+}.{format}", ap.Tile)
 	serv := []string{"localhost", ctx.String("port")}
 	log.Fatal(http.ListenAndServe(strings.Join(serv, ":"), router))
 	log.Printf("Listening @ %s", strings.Join(serv, ":"))

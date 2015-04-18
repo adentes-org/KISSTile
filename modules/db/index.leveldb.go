@@ -28,6 +28,27 @@ type Index struct {
 
 const bucket_name string = "Ways"
 
+//TODO add level of way in order to filter way in
+
+func (this *Index) Close() error {
+	return this.db.Close()
+}
+func (this *Index) GetWayInBBox(bb geo.Bbox) ([]int64, error) {
+	var n int64
+	iter := this.db.NewIterator(nil, nil)
+	for iter.Next() {
+		key := iter.Key()
+		//log.Println(iter.Key())
+		if key[0] != byte('_') && bb.IntersectWith(Bboxfrombytes(iter.Value())) {
+			//log.Println(iter.Key())
+			n++
+		}
+	}
+	iter.Release()
+	err := iter.Error()
+	log.Println(n)
+	return nil, err
+}
 func (this *Index) LoadOrCreateOf(file string) (*Index, error) {
 
 	file = this.getFilenameFromFile(file)
@@ -148,6 +169,11 @@ func (this *Index) Get(wayid int64) (geo.Bbox, error) {
 	//log.Println(len(bytes))
 	return geo.Bbox{geo.Point{Float64frombytes(bytes[0:8]), Float64frombytes(bytes[8:16])}, geo.Point{Float64frombytes(bytes[16:24]), Float64frombytes(bytes[24:32])}}, err
 }
+
+func Bboxfrombytes(bytes []byte) geo.Bbox {
+	return geo.Bbox{geo.Point{Float64frombytes(bytes[0:8]), Float64frombytes(bytes[8:16])}, geo.Point{Float64frombytes(bytes[16:24]), Float64frombytes(bytes[24:32])}}
+}
+
 func (this *Index) getFilenameFromFile(file string) string {
 	var extension = filepath.Ext(file)
 	return strings.Join([]string{file[0 : len(file)-len(extension)], "idx"}, ".")

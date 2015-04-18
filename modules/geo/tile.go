@@ -12,6 +12,9 @@ type Tile struct {
 	Lon float64
 }
 
+const lat_panel = 85.0511 * 2
+const lon_panel = 180 * 2
+
 type Conversion interface {
 	deg2num(t *Tile) (x int, y int)
 	num2deg(t *Tile) (lat float64, lon float64)
@@ -19,6 +22,7 @@ type Conversion interface {
 
 func NewTileFromZoomLatLon(zoom int, lat float64, lon float64) *Tile {
 	var t Tile
+	// On verifie que l'on est bien sur terre (360 + 85.0.511)
 	t.Lat = lat
 	t.Lon = lon
 	t.Z = zoom
@@ -28,8 +32,9 @@ func NewTileFromZoomLatLon(zoom int, lat float64, lon float64) *Tile {
 func NewTileFromZXY(z int, x int, y int) *Tile {
 	var t Tile
 	t.Z = z
-	t.X = x
-	t.Y = y
+	nbtile := NbAtZLevel(z)
+	t.X = x % int(nbtile)
+	t.Y = y % int(nbtile)
 	t.Lat, t.Lon = Num2deg(&t)
 	return &t
 }
@@ -43,8 +48,30 @@ func Deg2num(t *Tile) (x int, y int) {
 
 //func (*Tile) Num2deg(t *Tile) (lat float64, lon float64) {
 func Num2deg(t *Tile) (lat float64, lon float64) {
-	n := math.Pi - 2.0*math.Pi*float64(t.Y)/math.Exp2(float64(t.Z))
-	lat = 180.0 / math.Pi * math.Atan(0.5*(math.Exp(n)-math.Exp(-n)))
-	lon = float64(t.X)/math.Exp2(float64(t.Z))*360.0 - 180.0
+	n := math.Exp2(float64(t.Z))
+	lat = 180.0 / math.Pi * math.Atan(math.Sinh(math.Pi*(1-2*float64(t.Y)/n)))
+	lon = float64(t.X)/n*360.0 - 180.0
 	return lat, lon
+}
+
+func NbAtZLevel(zoom int) float64 {
+	//number of tile
+	//TODO cache the result in struct of tile
+	return math.Exp2(float64(zoom))
+}
+func PrecisionAtZLevel(zoom int) (lat float64, lon float64) {
+	//number of tile
+	//TODO cache the result in struct of tile
+	n := NbAtZLevel(zoom)
+	//Precision
+	lat = lat_panel / n
+	lon = lon_panel / n
+	return lat, lon
+}
+
+func (t *Tile) GetBBOX() Bbox {
+	//TODO cache the result in struct of tile
+	p_lat, p_lon := PrecisionAtZLevel(t.Z)
+	return Bbox{Point{t.Lat, t.Lon}, Point{t.Lat - p_lat, t.Lon + p_lon}}
+
 }
