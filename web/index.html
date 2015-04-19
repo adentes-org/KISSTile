@@ -8,7 +8,9 @@
 	<div id="map" style="height: 100%;width: 100%;position: absolute;top:0;left:0;"></div>
 	<script>
 	// create a map in the "map" div, set the view to a given place and zoom
-var map = L.map('map').setView([42.12,  8.9], 9);
+	//Corse [42.12,  8.9], 9
+	//Paris [48.886,  2.278], 9
+var map = L.map('map').setView([48.886,  2.278], 9);
 
 // add an OpenStreetMap tile layer
 L.tileLayer('http://localhost/api/tile/{z}/{x}/{y}.jpg', {}).addTo(map);

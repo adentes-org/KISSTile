@@ -5,6 +5,7 @@ import (
 	"../geo"
 	"bytes"
 	"fmt"
+	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/gorilla/mux"
 	"github.com/sapk/osmpbf"
 	"image"
@@ -97,28 +98,33 @@ func (this *Api) Tile(w http.ResponseWriter, r *http.Request) {
 		ways, _ := this.db.WayIndex.GetWayInBBox(bbox, "natural")
 		//fmt.Fprintf(w, "\nResulting ways : %d", len(ways))
 		//log.Printf("List %v", ways)
-		wanted := make(map[int64]*osmpbf.Way)
-		for _, w := range ways {
-			wanted[w] = nil
+		wanted := treeset.NewWith(db.CompareInt64)
+		for _, way := range ways {
+			wanted.Add(way)
 			// element is the element from someSlice for where we are
 		}
+
 		//TODO add function to filter by zoom rendering (features)
-		log.Printf("Searching for %d ways", len(wanted))
-		founded, _ := this.db.GetWays(&wanted)
-		log.Printf("%d ways founded", len(founded))
+		log.Printf("Searching for %d ways", wanted.Size())
+		var found map[int64]*osmpbf.Way
+		found, _ = this.db.GetWays(wanted)
+		log.Printf("%d ways found", len(found))
 		log.Printf("TIME ELAPSED @WaysFound : %s", time.Since(start).String())
 
-		wanted_node := make(map[int64]*osmpbf.Node)
-		for _, way := range founded {
-			for _, nodeId := range way.NodeIDs {
-				wanted_node[nodeId] = nil
+		wanted_node := treeset.NewWith(db.CompareInt64)
+		var nodeId int64
+		for _, way := range found {
+			for _, nodeId = range way.NodeIDs {
+				wanted_node.Add(nodeId)
 			}
 		}
-		log.Printf("Searching for %d nodes", len(wanted_node))
-		founded_nodes, _ := this.db.GetNodes(&wanted_node)
+		log.Printf("Searching for %d nodes", wanted_node.Size())
+		//founded_nodes, _ := this.db.GetNodes(&wanted_node)
+		//TODO
+		founded_nodes, _ := this.db.GetNodes(wanted_node, nil)
 		log.Printf("%d nodes founded", len(founded_nodes))
 		log.Printf("TIME ELAPSED @NodesFound : %s", time.Since(start).String())
-		img, err := tile.DrawTile(founded, founded_nodes, true)
+		img, err := tile.DrawTile(found, founded_nodes, true)
 		if err != nil {
 			http.Error(w, http.StatusText(500), 500)
 			log.Printf("ERROR @GENERATION : %s", time.Since(start).String())

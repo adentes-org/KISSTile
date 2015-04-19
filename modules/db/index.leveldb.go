@@ -45,7 +45,7 @@ func (this *Index) GetWayInBBox(bb geo.Bbox, tag string) ([]int64, error) {
 		if key[0] != byte('_') {
 			tmp := Bboxfrombytes(iter.Value())
 			//TODO determine best ratio
-			if bb.IntersectWith(tmp) && size < tmp.Size()*256 && size*256 > tmp.Size() {
+			if bb.IntersectWith(tmp) && size < tmp.Size()*1000 && size*1000 > tmp.Size() {
 				//log.Println(iter.Key())
 				//				ret = append(ret, Int64frombytes(key))
 				k, _ := strconv.ParseInt(strings.Split(string(key[:]), ":")[1], 10, 64)

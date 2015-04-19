@@ -4,6 +4,8 @@ package db
 import (
 	"../geo"
 	"fmt"
+	"github.com/emirpasic/gods/sets/treeset"
+	//"github.com/emirpasic/gods/utils"
 	"github.com/sapk/osmpbf"
 	"io"
 	"log"
@@ -17,7 +19,10 @@ const MaxUint64 = ^uint64(0)
 const MaxInt64 = int64(MaxUint64 >> 1)
 
 //TODO used Sizeof and used a Mo,Mb type
-const CacheSize = 1750000
+const CacheSize = 750000
+
+//0,65Ko/Obj
+//const CacheSize = -1
 
 //TODO pass to Point to save space
 //TODO optimize cache to take account of last access time to grabage not used
@@ -95,6 +100,18 @@ func (this *Db) Analyze(n int) error {
 	*/
 	return nil
 }
+func CompareInt64(a, b interface{}) int {
+	aInt := a.(int64)
+	bInt := b.(int64)
+	switch {
+	case aInt > bInt:
+		return 1
+	case aInt < bInt:
+		return -1
+	default:
+		return 0
+	}
+}
 
 // Scan before processing need to be call frist after start.
 func (this *Db) ParseWays() error {
@@ -108,11 +125,13 @@ func (this *Db) ParseWays() error {
 
 	var bb geo.Bbox
 	var ways []*osmpbf.Way
-	wanted := make(map[int64]*osmpbf.Node)
+	wanted := treeset.NewWith(CompareInt64)
+	//wanted := make(map[int64]*osmpbf.Node)
 
 	var cw, cow, cn, last int64
 	cow = this.WayIndex.Size()
 	last = this.WayIndex.Last()
+	found := make(map[int64]*osmpbf.Node, 0)
 	//TODO find nodes by block of wa in order to not redecode the start of a block
 	for i := 0; i < len(this.Descriptor.Ways)-1; i++ {
 		if this.Descriptor.WaysId[i+1] < last {
@@ -139,18 +158,33 @@ func (this *Db) ParseWays() error {
 				//log.Printf("Adding to search %d", v.ID)
 				ways = ExtendWays(ways, v)
 				//TODO check ways with no nodes maybe ?
-				//TODO used an ordered list
+				//TODO used an ordered list (invert)
 				for _, nodeId := range v.NodeIDs {
-					wanted[nodeId] = nil
+					/*
+						for i := 0; i < len(wanted); i++ {
+							if nodeId <= wanted[i] {
+								break
+							}
+						}
+						//We don't insert if nodeId == wanted[i] (duplicate)
+						if i == len(wanted) || nodeId < wanted[i] {
+							wanted = append(wanted[:i], append([]int64{nodeId}, wanted[i:]...)...)
+						}
+
+						//wanted = append(wanted, nodeId)
+						//wanted[nodeId] = nil
+					*/
+					wanted.Add(nodeId)
 				}
 				break
 			}
 		}
-		if len(wanted) > CacheSize || i == len(this.Descriptor.Ways)-2 {
-			log.Printf("On parse les points pour %d ways soit %d nodes recherchés", len(ways), len(wanted))
-			found, _ := this.GetNodes(&wanted)
+		if wanted.Size() > CacheSize || i == len(this.Descriptor.Ways)-2 {
+			log.Printf("On parse les points pour %d ways soit %d nodes recherchés", len(ways), wanted.Size())
+			//TODO reused allready found on previous round
+			found, _ = this.GetNodes(wanted, found)
 			//On reset wanted to save space (not obligated but in case it not clear by getNodes)
-			wanted = make(map[int64]*osmpbf.Node, 0)
+			wanted.Clear()
 
 			for _, way := range ways {
 				for id, nodeId := range way.NodeIDs {
@@ -194,6 +228,8 @@ func (this *Db) ParseWays() error {
 		}
 	}
 
+	found = make(map[int64]*osmpbf.Node, 0)
+	wanted.Clear()
 	return nil
 }
 
@@ -274,12 +310,36 @@ func (this *Db) Describe() (FileDescriptor, error) {
 	return this.Descriptor, nil
 }
 
+func (this *Db) getBlockContainingWays(wanted *treeset.Set) ([]int, error) {
+	var ret []int
+	lwi := 0
+	l := (*wanted).Size()
+	list := (*wanted).Values()
+	for i := 0; i < len(this.Descriptor.Ways)-1; i++ {
+		//this.Descriptor.NodesId[i] Contain the first id of the block i
+		//The last is a fake and contain MaxInt64
+		//TODO use a array of int64 less memery consuming than map
+		for wi := lwi; wi < l; wi++ {
+			if list[wi].(int64) >= this.Descriptor.WaysId[i] && list[wi].(int64) <= this.Descriptor.WaysId[i+1] {
+				ret = append(ret, i)
+				lwi = wi
+				break
+			}
+		}
+	}
+	return ret, nil
+}
+
 // Get multiples node by ids at a time.
 //TODO not used map array but ordered list and clear one at a time
 //TODO determine block we only need to decrypt
-func (this *Db) GetWays(wanted *map[int64]*osmpbf.Way) (map[int64]*osmpbf.Way, error) {
+func (this *Db) GetWays(wanted *treeset.Set) (map[int64]*osmpbf.Way, error) {
 	found := make(map[int64]*osmpbf.Way)
-	for i := 0; i < len(this.Descriptor.Ways)-1; i++ {
+	l := (*wanted).Size()
+	list := (*wanted).Values()
+	log.Printf("Nodes to find : %v", l)
+	blocks, _ := this.getBlockContainingWays(wanted)
+	for _, i := range blocks {
 		ns, err := this.Decoder.DecodeBlocAt(this.Descriptor.Ways[i])
 		if err != nil {
 			return nil, err
@@ -287,37 +347,65 @@ func (this *Db) GetWays(wanted *map[int64]*osmpbf.Way) (map[int64]*osmpbf.Way, e
 		for _, v := range ns {
 			switch v := v.(type) {
 			case *osmpbf.Way:
-				if _, ok := (*wanted)[v.ID]; ok {
-					delete(*wanted, v.ID)
+				if v.ID == list[0] {
 					found[v.ID] = v
+					if len(list) == 1 {
+						//Il ne restait plus qu'un élément et on vient de le trouver
+						log.Printf("All %d nodes found", len(found))
+						list = nil
+						return found, nil
+					}
+					//On enleve le première élément
+					list = list[1:]
 				}
 				break
 			}
 		}
-
-		if len(*wanted) == 0 {
-			//On s'arrete là
-			break
-		}
-
-		//TODO only read needed
-		/*
-			if len(wanted) == 0 {
-				// on arrete y'a plus rien à chercher
-				break
-			}
-		*/
 	}
-	//log.Printf("All %d ways found", len(found))
+	log.Printf("All %d ways found", len(found))
 
 	return found, nil
 }
+func (this *Db) getBlockContainingNodes(wanted *treeset.Set) ([]int, error) {
+	var ret []int
+	lwi := 0
+	l := (*wanted).Size()
+	list := (*wanted).Values()
+	for i := 0; i < len(this.Descriptor.Nodes)-1; i++ {
+		//this.Descriptor.NodesId[i] Contain the first id of the block i
+		//The last is a fake and contain MaxInt64
+		//TODO use a array of int64 less memery consuming than map
+		for wi := lwi; wi < l; wi++ {
+			if list[wi].(int64) >= this.Descriptor.NodesId[i] && list[wi].(int64) <= this.Descriptor.NodesId[i+1] {
+				ret = append(ret, i)
+				lwi = wi
+				break
+			}
+		}
+	}
+	return ret, nil
+}
 
 // Get multiples node by ids at a time.
-func (this *Db) GetNodes(wanted *map[int64]*osmpbf.Node) (map[int64]*osmpbf.Node, error) {
+func (this *Db) GetNodes(wanted *treeset.Set, alfound map[int64]*osmpbf.Node) (map[int64]*osmpbf.Node, error) {
 	found := make(map[int64]*osmpbf.Node)
+	nb := wanted.Size()
+	for id, val := range alfound {
+		if wanted.Contains(id) {
+			found[id] = val
+			wanted.Remove(id)
+		}
+	}
+	nb -= wanted.Size()
+	alfound = nil
+	log.Printf("Nodes reused : %d", nb)
 	// On cherche les points
-	for i := 0; i < len(this.Descriptor.Nodes)-1; i++ {
+	l := (*wanted).Size()
+	list := (*wanted).Values()
+	log.Printf("Nodes to find : %v", l)
+	blocks, _ := this.getBlockContainingNodes(wanted)
+	log.Printf("Block to read : %d / %d", len(blocks), len(this.Descriptor.NodesId))
+	for _, i := range blocks {
 		ns, err := this.Decoder.DecodeBlocAt(this.Descriptor.Nodes[i])
 		if err != nil {
 			return nil, err
@@ -325,27 +413,23 @@ func (this *Db) GetNodes(wanted *map[int64]*osmpbf.Node) (map[int64]*osmpbf.Node
 		for _, v := range ns {
 			switch v := v.(type) {
 			case *osmpbf.Node:
-				if _, ok := (*wanted)[v.ID]; ok {
-					delete(*wanted, v.ID)
+				if v.ID == list[0] {
 					found[v.ID] = v
+					if len(list) == 1 {
+						//Il ne restait plus qu'un élément et on vient de le trouver
+						log.Printf("All %d nodes found", len(found))
+						list = nil
+						return found, nil
+					}
+					//On enleve le première élément
+					list = list[1:]
 				}
 				break
 			}
 		}
 
-		if len(*wanted) == 0 {
-			//On s'arrete là
-			break
-		}
-		//TODO only read needed
-		/*
-			if len(wanted) == 0 {
-				// on arrete y'a plus rien à chercher
-				break
-			}
-		*/
 	}
-	//log.Printf("All %d nodes found", len(found))
+	log.Printf("All %d nodes found", len(found))
 	return found, nil
 }
 

@@ -42,6 +42,7 @@ func Analyze(file string) *db.Db {
 
 	log.Printf("NbProc : %d", runtime.GOMAXPROCS(-1))
 
+	//	db.Analyze(runtime.GOMAXPROCS(-1))
 	db.Analyze(runtime.GOMAXPROCS(-1))
 
 	return db

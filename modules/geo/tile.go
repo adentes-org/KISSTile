@@ -79,7 +79,9 @@ func PrecisionAtZLevel(zoom int) (lat float64, lon float64) {
 	lat = lat_panel / n
 	lon = lon_panel / n
 	//TODO why ?
-	return lat * math.Pi / 2, lon
+	//return lat * math.Pi / 2, lon
+	return lat, lon
+
 }
 
 func (t *Tile) GetBBOX() Bbox {
@@ -126,6 +128,9 @@ func (t *Tile) DrawTile(ways map[int64]*osmpbf.Way, nodes map[int64]*osmpbf.Node
 		//	log.Printf("way : %v", way)
 		//	log.Printf("coords : %v", coords)
 	}
+	//TODO
+	bb := t.GetBBOX()
+	drawPolyLine(img, color.Black, [][]float64{{(bb[0].Lon - t.Lon) * tileSize / plon, (t.Lat - bb[0].Lat) * tileSize / plat}, {(bb[1].Lon - t.Lon) * tileSize / plon, (t.Lat - bb[1].Lat) * tileSize / plat}})
 	return img, nil
 }
 
