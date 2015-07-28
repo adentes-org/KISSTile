@@ -6,7 +6,7 @@ import (
 
 	"github.com/codegangsta/cli"
 
-	"./cmd"
+	"github.com/adentes-org/KISSTile/cmd"
 )
 
 const APP_VER = "0.0.1.0001 Alpha"
