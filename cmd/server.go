@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"./../modules/api"
+	"github.com/adentes-org/KISSTile/modules/api"
 	"github.com/codegangsta/cli"
 	"github.com/gorilla/mux"
 	"io/ioutil"
