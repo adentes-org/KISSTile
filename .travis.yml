@@ -6,7 +6,7 @@ go:
   - 1.4
   
 install: 
-  - rm -Rf "$GOPATH/src"
+  - rm -Rf "$GOPATH/src/*"
   - go get -t -v github.com/adentes-org/KISSTile
 
 script: go build -v
