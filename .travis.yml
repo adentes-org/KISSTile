@@ -6,7 +6,6 @@ go:
   - 1.4
   
 install: 
-  - rm -Rf $GOPATH/src/*
   - go get -t -v ./...
 
 script: go build -v
