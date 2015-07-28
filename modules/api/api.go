@@ -1,8 +1,8 @@
 package api
 
 import (
-	"../db"
-	"../geo"
+	"github.com/adentes-org/KISSTile/modules/db"
+	"github.com/adentes-org/KISSTile/modules/geo"
 	"bytes"
 	"fmt"
 	"github.com/emirpasic/gods/sets/treeset"
