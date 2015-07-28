@@ -5,7 +5,7 @@ import (
 	"log"
 	"runtime"
 
-	"./../modules/db"
+	"github.com/adentes-org/KISSTile/modules/modules/db"
 )
 
 type BoolFlag struct {
