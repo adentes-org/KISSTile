@@ -6,7 +6,7 @@ go:
   - 1.4
   
 install: 
-  - go get -t -v -u ./...
+  - go get -t -v -u github.com/adentes-org/KISSTile
 
 script: go build -v
 
