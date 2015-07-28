@@ -1,4 +1,4 @@
-# KISSTile
+# KISSTile [![Build Status](https://travis-ci.org/adentes-org/KISSTile.svg?branch=master)](https://travis-ci.org/adentes-org/KISSTile)
 Simple OpenStreetMap tile rendering server.
 
 ##### Still under development
