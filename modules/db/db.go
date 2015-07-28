@@ -2,7 +2,7 @@
 package db
 
 import (
-	"../geo"
+	"github.com/adentes-org/KISSTile/modules/geo"
 	"fmt"
 	"github.com/emirpasic/gods/sets/treeset"
 	//"github.com/emirpasic/gods/utils"
