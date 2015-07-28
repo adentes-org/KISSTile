@@ -4,7 +4,7 @@ package db
 
 import (
 	//"github.com/mattn/go-sqlite3"
-	"./../geo"
+	"github.com/adentes-org/KISSTile/modules/geo"
 	//	"bytes"
 	"encoding/binary"
 	//	"errors"
